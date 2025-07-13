@@ -9,6 +9,7 @@ import core.LostHandler
 import core.NoteAddedHandler
 import core.Shipment
 import core.ShippedHandler
+import simulator.ShipmentEvent
 import kotlinx.coroutines.*
 import java.io.File
 

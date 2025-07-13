@@ -8,16 +8,22 @@ import javafx.collections.ObservableList
 import simulator.TrackingSimulator
 import java.text.SimpleDateFormat
 import java.util.*
+import tornadofx.runLater
 
 class TrackerViewHelper : ShipmentObserver {
     private var shipment: Shipment? = null
 
     // State properties from original UML
+    val shipmentId = SimpleStringProperty("")
     val shipmentStatus = SimpleStringProperty("")
     val shipmentNotes: ObservableList<String> = FXCollections.observableArrayList()
     val shipmentUpdateHistory: ObservableList<String> = FXCollections.observableArrayList()
     val expectedShipmentDeliveryDate = SimpleStringProperty("")
     val currentLocation = SimpleStringProperty("")
+
+    fun refreshProperties() {
+        updateDisplay()
+    }
 
     fun trackShipment(id: String) {
         // Stop tracking current shipment if any
@@ -26,10 +32,12 @@ class TrackerViewHelper : ShipmentObserver {
         // Find new shipment
         shipment = TrackingSimulator.findShipment(id)
         if (shipment == null) {
+            shipmentId.set(id)
             shipmentStatus.set("core.Shipment not found")
             return
         }
 
+        shipmentId.set(id)
         shipment?.addObserver(this)
         updateDisplay()
     }
@@ -46,17 +54,20 @@ class TrackerViewHelper : ShipmentObserver {
 
     private fun updateDisplay() {
         shipment?.let {
-            shipmentStatus.set(it.status)
-            currentLocation.set(it.currentLocation)
-            expectedShipmentDeliveryDate.set(formatDate(it.expectedDeliveryDateTimestamp))
-            shipmentNotes.setAll(it.notes)
-            shipmentUpdateHistory.setAll(it.updateHistory.map { update ->
-                "core.Shipment went from ${update.previousStatus} to ${update.newStatus} on ${formatDate(update.timestamp)}"
-            })
+            runLater {
+                shipmentStatus.set(it.status)
+                currentLocation.set(it.currentLocation)
+                expectedShipmentDeliveryDate.set(formatDate(it.expectedDeliveryDateTimestamp))
+                shipmentNotes.setAll(it.notes)
+                shipmentUpdateHistory.setAll(it.updateHistory.map { update ->
+                    "core.Shipment went from ${update.previousStatus} to ${update.newStatus} on ${formatDate(update.timestamp)}"
+                })
+            }
         }
     }
 
     private fun clearDisplay() {
+        shipmentId.set("")
         shipmentStatus.set("")
         currentLocation.set("")
         expectedShipmentDeliveryDate.set("")
@@ -66,7 +77,7 @@ class TrackerViewHelper : ShipmentObserver {
 
     private fun formatDate(timestamp: Long): String {
         if (timestamp <= 0) return "Unknown"
-        val date = Date(timestamp * 1000) // Convert seconds to milliseconds
+        val date = Date(timestamp) // timestamp is already in ms
         return SimpleDateFormat("yyyy-MM-dd HH:mm").format(date)
     }
 }

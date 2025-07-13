@@ -1,14 +1,8 @@
 package ui
 
 import javafx.geometry.Insets
-import javafx.scene.control.Alert
-import javafx.scene.control.Button
-import javafx.scene.control.Label
-import javafx.scene.control.ListView
-import javafx.scene.control.TextField
-import javafx.scene.layout.HBox
-import javafx.scene.layout.Priority
-import javafx.scene.layout.VBox
+import javafx.scene.control.*
+import javafx.scene.layout.*
 import simulator.TrackingSimulator
 import tornadofx.*
 
@@ -16,6 +10,11 @@ class MainView : View("core.Shipment Tracker") {
     private val inputField = TextField()
     private val trackButton = Button("Track")
     private val container = VBox()
+    private val scrollPane = ScrollPane(container).apply {
+        isFitToWidth = true
+        vbarPolicy = ScrollPane.ScrollBarPolicy.AS_NEEDED
+        hbarPolicy = ScrollPane.ScrollBarPolicy.NEVER
+    }
 
     private val trackingHelpers = mutableMapOf<String, TrackerViewHelper>()
     private val trackingPanels = mutableMapOf<String, VBox>()
@@ -28,8 +27,8 @@ class MainView : View("core.Shipment Tracker") {
                 inputField.apply { HBox.setHgrow(this, Priority.ALWAYS) },
                 trackButton
             )
-        }
-                children.add(container.apply { VBox.setVgrow(this, Priority.ALWAYS) })
+        })
+        children.add(scrollPane.apply { VBox.setVgrow(this, Priority.ALWAYS) })
     }
 
     init {
@@ -44,6 +43,8 @@ class MainView : View("core.Shipment Tracker") {
 
             val helper = TrackerViewHelper()
             helper.trackShipment(id)
+            // Ensure properties are refreshed after tracking starts
+            helper.refreshProperties()
 
             if (helper.shipmentStatus.get() == "core.Shipment not found") {
                 showAlert("Not Found", "core.Shipment $id does not exist")
@@ -57,7 +58,8 @@ class MainView : View("core.Shipment Tracker") {
     }
 
     private fun addTrackingPanel(id: String, helper: TrackerViewHelper) {
-        val panel = VBox(10.0).apply {
+        lateinit var panel: VBox
+        panel = VBox(10.0).apply {
             padding = Insets(10.0)
             style {
                 borderColor += box(javafx.scene.paint.Color.LIGHTGRAY)
@@ -66,7 +68,7 @@ class MainView : View("core.Shipment Tracker") {
             }
 
             children.addAll(
-                Label("ID: $id"),
+                Label().apply { textProperty().bind(helper.shipmentId) },
                 HBox(5.0, Label("Status:"), Label().apply { textProperty().bind(helper.shipmentStatus) }),
                 HBox(5.0, Label("Location:"), Label().apply { textProperty().bind(helper.currentLocation) }),
                 HBox(5.0, Label("Expected Delivery:"), Label().apply { textProperty().bind(helper.expectedShipmentDeliveryDate) }),
@@ -78,8 +80,10 @@ class MainView : View("core.Shipment Tracker") {
                     setOnAction {
                         helper.stopTracking()
                         trackingHelpers.remove(id)
-                        container.children.remove(panel)
                         trackingPanels.remove(id)
+                        runLater {
+                            container.children.remove(panel)
+                        }
                     }
                 }
             )
@@ -94,8 +98,15 @@ class MainView : View("core.Shipment Tracker") {
     }
 
     override fun onDock() {
-        // Initialize with sample data file
-        TrackingSimulator.initialize("shipment_updates.txt")
+        // Get resource URL using classloader
+        val resource = javaClass.getResource("/test.txt")
+        if (resource == null) {
+            showAlert("Error", "Resource file not found: test.txt")
+            return
+        }
+
+        // Initialize with the absolute path from the resource URL
+        TrackingSimulator.initialize(resource.toURI().path)
         TrackingSimulator.runSimulation()
     }
 
